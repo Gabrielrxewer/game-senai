@@ -1,9 +1,9 @@
-import type { Game } from '../core/Game';
-import type { State } from '../core/State';
-import { Player } from '../entities/Player';
-import { Obstacle } from '../entities/Obstacle';
-import { RankingService } from '../services/RankingService';
-import { ScoreService } from '../services/ScoreService';
+import type { Game } from "../core/Game";
+import type { State } from "../core/State";
+import { Player } from "../entities/Player";
+import { Obstacle } from "../entities/Obstacle";
+import { RankingService } from "../services/RankingService";
+import { ScoreService } from "../services/ScoreService";
 
 interface Cloud {
   x: number;
@@ -13,25 +13,55 @@ interface Cloud {
 }
 
 export class GameScene implements State {
-  readonly id = 'game';
+  readonly id = "game";
   private readonly player: Player;
   private readonly obstacles: Obstacle[] = [];
   private readonly clouds: Cloud[] = [];
+
   private spawnTimer = 0;
   private readonly spawnInterval = 1.8;
   private speed = 250;
   private distance = 0;
+
   private readonly groundHeight = 80;
   private readonly baseObstacleSpeed = 80;
-  private professorOffset = 80;
+
+  // Limite inferior (chão) usado por todo mundo
+  private readonly groundY: number;
+
+  private readonly gravity = 1200;
+
+  // Player já usa o próprio jumpForce lá no Player.ts
+
+  // Diploma (na frente do player)
+  private readonly diplomaWidth = 60;
+  private readonly diplomaHeight = 30;
+  private readonly diplomaOffsetX = 280; // distância à frente do player
+  private diplomaY: number;
+  private diplomaVelocityY = 0;
+  private readonly diplomaFlapForce = -580;
+
+  // Professor (atrás do player)
+  private readonly professorWidth = 38;
+  private readonly professorHeight = 55;
+  private readonly professorOffsetX = 80; // distância atrás do player
+  private professorY: number;
+  private professorVelocityY = 0;
+  private readonly professorFlapForce = -600;
 
   constructor(
     private readonly game: Game,
     private readonly scoreService: ScoreService,
     private readonly rankingService: RankingService
   ) {
+    const { height } = game.getConfig();
+    this.groundY = height - this.groundHeight;
+
     this.player = new Player(game);
     this.createInitialClouds();
+
+    this.diplomaY = this.groundY - this.diplomaHeight;
+    this.professorY = this.groundY - this.professorHeight;
   }
 
   onEnter(): void {
@@ -50,7 +80,9 @@ export class GameScene implements State {
     }
 
     this.player.update(deltaTime);
-    this.obstacles.forEach((obstacle) => obstacle.update(deltaTime, this.baseObstacleSpeed + this.speed));
+    this.obstacles.forEach((obstacle) =>
+      obstacle.update(deltaTime, this.baseObstacleSpeed + this.speed)
+    );
 
     while (this.obstacles.length > 0 && this.obstacles[0].isOffScreen()) {
       this.obstacles.shift();
@@ -66,7 +98,8 @@ export class GameScene implements State {
       }
     });
 
-    this.professorOffset = 80 + Math.sin(performance.now() / 500) * 10;
+    this.updateDiploma(deltaTime);
+    this.updateProfessor(deltaTime);
 
     if (this.hasCollision()) {
       this.handleGameOver();
@@ -76,12 +109,12 @@ export class GameScene implements State {
   render(ctx: CanvasRenderingContext2D): void {
     const { width, height } = this.game.getConfig();
 
-    ctx.fillStyle = '#1c2541';
+    ctx.fillStyle = "#1c2541";
     ctx.fillRect(0, 0, width, height);
 
     this.renderClouds(ctx);
 
-    ctx.fillStyle = '#3a506b';
+    ctx.fillStyle = "#3a506b";
     ctx.fillRect(0, height - this.groundHeight, width, this.groundHeight);
 
     this.renderDiploma(ctx);
@@ -90,7 +123,7 @@ export class GameScene implements State {
     this.player.render(ctx);
     this.obstacles.forEach((obstacle) => obstacle.render(ctx));
 
-    ctx.fillStyle = '#f8ffe5';
+    ctx.fillStyle = "#f8ffe5";
     ctx.font = '24px "Segoe UI", sans-serif';
     ctx.fillText(`Distância: ${Math.floor(this.distance)} m`, 32, 48);
     ctx.fillText(`Recorde: ${this.scoreService.getBestScore()} m`, 32, 80);
@@ -102,13 +135,20 @@ export class GameScene implements State {
   }
 
   handleInput(event: KeyboardEvent | MouseEvent): void {
-    if (event instanceof KeyboardEvent) {
-      if (event.code === 'Space' || event.code === 'ArrowUp') {
+    const isJumpInput =
+      event instanceof KeyboardEvent
+        ? event.code === "Space" || event.code === "ArrowUp"
+        : true;
+
+    if (isJumpInput) {
+      if (event instanceof KeyboardEvent) {
         event.preventDefault();
-        this.player.jump();
       }
-    } else {
+
       this.player.jump();
+
+      this.flapDiploma();
+      this.flapProfessor();
     }
   }
 
@@ -118,6 +158,12 @@ export class GameScene implements State {
     this.distance = 0;
     this.speed = 250;
     this.spawnTimer = this.spawnInterval;
+
+    this.diplomaY = this.groundY - this.diplomaHeight;
+    this.diplomaVelocityY = 0;
+
+    this.professorY = this.groundY - this.professorHeight;
+    this.professorVelocityY = 0;
   }
 
   private spawnObstacle(): void {
@@ -142,36 +188,96 @@ export class GameScene implements State {
     const score = Math.floor(this.distance);
     this.rankingService.setLastScore(score);
     this.rankingService.saveScore(score);
-    this.game.changeState('game-over');
+    this.game.changeState("game-over");
+  }
+
+  private flapDiploma(): void {
+    this.diplomaVelocityY = this.diplomaFlapForce;
+  }
+
+  private updateDiploma(deltaTime: number): void {
+    this.diplomaVelocityY += this.gravity * deltaTime;
+    this.diplomaY += this.diplomaVelocityY * deltaTime;
+
+    if (this.diplomaY < 0) {
+      this.diplomaY = 0;
+      this.diplomaVelocityY = 0;
+    }
+
+    if (this.diplomaY + this.diplomaHeight >= this.groundY) {
+      this.diplomaY = this.groundY - this.diplomaHeight;
+      this.diplomaVelocityY = 0;
+    }
   }
 
   private renderDiploma(ctx: CanvasRenderingContext2D): void {
-    const diplomaX = this.player.x + 280;
-    const diplomaY = this.player.y - 40;
-    ctx.fillStyle = '#ffe066';
-    ctx.fillRect(diplomaX, diplomaY, 60, 30);
-    ctx.strokeStyle = '#d4a418';
+    const diplomaX = this.player.x + this.diplomaOffsetX;
+    const diplomaY = this.diplomaY;
+
+    ctx.fillStyle = "#ffe066";
+    ctx.fillRect(diplomaX, diplomaY, this.diplomaWidth, this.diplomaHeight);
+    ctx.strokeStyle = "#d4a418";
     ctx.lineWidth = 4;
-    ctx.strokeRect(diplomaX, diplomaY, 60, 30);
-    ctx.fillStyle = '#ef476f';
+    ctx.strokeRect(diplomaX, diplomaY, this.diplomaWidth, this.diplomaHeight);
+
+    ctx.fillStyle = "#ef476f";
     ctx.beginPath();
-    ctx.arc(diplomaX + 50, diplomaY + 15, 8, 0, Math.PI * 2);
+    ctx.arc(
+      diplomaX + this.diplomaWidth - 10,
+      diplomaY + this.diplomaHeight / 2,
+      8,
+      0,
+      Math.PI * 2
+    );
     ctx.fill();
-    ctx.fillStyle = '#f8ffe5';
+
+    ctx.fillStyle = "#f8ffe5";
     ctx.font = '14px "Segoe UI", sans-serif';
-    ctx.fillText('Diploma', diplomaX - 10, diplomaY + 50);
+    ctx.fillText("Diploma", diplomaX - 10, diplomaY + this.diplomaHeight + 20);
+  }
+
+  // --- FLAPPY PROFESSOR ---
+  private flapProfessor(): void {
+    this.professorVelocityY = this.professorFlapForce;
+  }
+
+  private updateProfessor(deltaTime: number): void {
+    this.professorVelocityY += this.gravity * deltaTime;
+    this.professorY += this.professorVelocityY * deltaTime;
+
+    if (this.professorY < 0) {
+      this.professorY = 0;
+      this.professorVelocityY = 0;
+    }
+
+    if (this.professorY + this.professorHeight >= this.groundY) {
+      this.professorY = this.groundY - this.professorHeight;
+      this.professorVelocityY = 0;
+    }
   }
 
   private renderProfessor(ctx: CanvasRenderingContext2D): void {
-    const { height } = this.game.getConfig();
-    const professorX = this.player.x - this.professorOffset;
-    const professorY = height - this.groundHeight - 55;
-    ctx.fillStyle = '#ef476f';
-    ctx.fillRect(professorX, professorY, 38, 55);
-    ctx.fillStyle = '#1c2541';
-    ctx.fillRect(professorX + 6, professorY + 10, 26, 20);
-    ctx.fillStyle = '#ffd166';
-    ctx.fillRect(professorX + 10, professorY - 8, 18, 18);
+    const professorX = this.player.x - this.professorOffsetX;
+    const professorY = this.professorY;
+
+    ctx.fillStyle = "#ef476f";
+    ctx.fillRect(
+      professorX,
+      professorY,
+      this.professorWidth,
+      this.professorHeight
+    );
+
+    ctx.fillStyle = "#1c2541";
+    ctx.fillRect(professorX + 6, professorY + 10, this.professorWidth - 12, 20);
+
+    ctx.fillStyle = "#ffd166";
+    ctx.fillRect(
+      professorX + (this.professorWidth - 18) / 2,
+      professorY - 8,
+      18,
+      18
+    );
   }
 
   private createInitialClouds(): void {
@@ -181,16 +287,24 @@ export class GameScene implements State {
         x: Math.random() * width,
         y: 40 + Math.random() * 150,
         speed: 40 + Math.random() * 40,
-        size: 80 + Math.random() * 60
+        size: 80 + Math.random() * 60,
       });
     }
   }
 
   private renderClouds(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
     this.clouds.forEach((cloud) => {
       ctx.beginPath();
-      ctx.ellipse(cloud.x, cloud.y, cloud.size, cloud.size * 0.6, 0, 0, Math.PI * 2);
+      ctx.ellipse(
+        cloud.x,
+        cloud.y,
+        cloud.size,
+        cloud.size * 0.6,
+        0,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
     });
   }

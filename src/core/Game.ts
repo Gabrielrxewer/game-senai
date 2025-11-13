@@ -1,4 +1,4 @@
-import type { State } from './State';
+import type { State } from "./State";
 
 export interface GameConfig {
   width: number;
@@ -14,9 +14,9 @@ export class Game {
   private animationFrameId: number | null = null;
 
   constructor(private readonly canvas: HTMLCanvasElement, config: GameConfig) {
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext("2d");
     if (!context) {
-      throw new Error('Canvas 2D context not available.');
+      throw new Error("Canvas 2D context not available.");
     }
 
     this.context = context;
