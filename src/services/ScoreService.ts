@@ -1,5 +1,5 @@
-const STORAGE_KEY = 'fuga-academica-best-score';
-const LAST_NICKNAME_KEY = 'fuga-academica-last-nickname';
+const STORAGE_KEY = "fuga-academica-best-score";
+const LAST_NICKNAME_KEY = "fuga-academica-last-nickname";
 
 export class ScoreService {
   getBestScore(): number {
