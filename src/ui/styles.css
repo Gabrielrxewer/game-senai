@@ -1,0 +1,19 @@
+:root {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #0b132b;
+  color: #fff;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+canvas {
+  border: 4px solid #5bc0be;
+  background: linear-gradient(180deg, #1c2541 0%, #3a506b 100%);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+}
