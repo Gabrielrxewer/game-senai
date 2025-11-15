@@ -1,19 +1,617 @@
 :root {
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: #0b132b;
-  color: #fff;
+  --bg-body: #020617;
+  --bg-canvas: #020617;
+  --accent-primary: #38bdf8;   /* ciano tech */
+  --accent-secondary: #22c55e; /* verde tech */
+
+  --text-main: #e5e7eb;
+  --text-soft: #9ca3af;
+  --text-soft-2: #6b7280;
+
+  --border-strong: #1f2937;
+}
+
+/* ================== BASE ================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: radial-gradient(circle at top, #020617 0, #000 70%);
+  color: var(--text-main);
 }
 
 body {
-  margin: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
 }
 
+/* Canvas do jogo */
 canvas {
-  border: 4px solid #5bc0be;
-  background: linear-gradient(180deg, #1c2541 0%, #3a506b 100%);
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+  background: var(--bg-canvas);
+  border: 2px solid rgba(31, 41, 55, 0.7);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.85);
+}
+
+/* ================== OVERLAY BASE ================== */
+
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 20;
+  text-align: center;
+  pointer-events: auto;
+  background: radial-gradient(circle at center, #020617 0, #020617 70%, #000 100%);
+  overflow: hidden;
+}
+
+/* grade animada (quadriculado em TODAS as telas) */
+.game-overlay::before {
+  content: "";
+  position: absolute;
+  inset: -80px;
+  background-image:
+    linear-gradient(
+      rgba(15, 23, 42, 0.8) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(15, 23, 42, 0.8) 1px,
+      transparent 1px
+    );
+  background-size: 40px 40px;
+  opacity: 0.42; /* um pouco mais visível */
+  transform: translate3d(0, 0, 0);
+  animation: grid-pan 32s linear infinite;
+}
+
+/* brilho suave por tela */
+.game-overlay::after {
+  content: "";
+  position: absolute;
+  inset: -15%;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Menu: tom azul/verde mais suave (menos brilho) */
+.game-overlay--menu::after {
+  background:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.32), transparent 60%),
+    radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.18), transparent 60%);
+}
+
+/* Game Over: tom vermelho mais pesado */
+.game-overlay--game-over::after {
+  background:
+    radial-gradient(circle at top right, rgba(127, 29, 29, 0.8), transparent 65%),
+    radial-gradient(circle at bottom left, rgba(248, 113, 113, 0.4), transparent 65%);
+}
+
+/* Ranking: tom dourado */
+.game-overlay--ranking::after {
+  background:
+    radial-gradient(circle at top, rgba(250, 204, 21, 0.45), transparent 60%),
+    radial-gradient(circle at bottom, rgba(56, 189, 248, 0.25), transparent 60%);
+}
+
+/* ================== PAINEL CENTRAL (AGORA DO TAMANHO DA TELA DO JOGO) ================== */
+
+.overlay-panel {
+  position: relative;
+  width: min(96vw, 960px);     /* largura máxima parecida com canvas 16:9 */
+  aspect-ratio: 16 / 9;        /* mantém proporção de tela de jogo */
+  min-height: 420px;
+  padding: 32px 40px 26px;
+  border-radius: 18px;
+  background: radial-gradient(circle at top, #020617 0, #020617 65%, #000 100%);
+  border: 1px solid rgba(31, 41, 55, 0.9);
+  box-shadow: 0 22px 38px rgba(15, 23, 42, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* tudo bem centralizado */
+  gap: 12px;
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+/* selo fixo no canto superior esquerdo da tela */
+.overlay-panel::before {
+  content: "Curso Técnico • Desenvolvimento de Sistemas";
+  position: fixed;             /* agora fixa na viewport */
+  top: 10px;                   /* bem perto do topo */
+  left: 10px;                  /* bem perto da esquerda */
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft-2);
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(31, 41, 55, 1);
+  z-index: 999;
+  pointer-events: none;        /* não bloqueia cliques */
+}
+
+/* espaçamento consistente entre blocos internos */
+.overlay-panel > * {
+  position: relative;
+  z-index: 3; /* fica acima dos efeitos */
+}
+
+.overlay-panel > * + * {
+  margin-top: 10px;
+}
+
+/* ================== TÍTULOS / TEXTOS ================== */
+
+/* BASE (usado principalmente no MENU) */
+.overlay-title {
+  margin: 26px 0 4px;
+  font-size: clamp(2.6rem, 4.4vw, 3.4rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  position: relative;
+
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* menu: agradável, tech e menos brilho */
+  background-image: linear-gradient(
+    120deg,
+    #38bdf8,
+    #22c55e,
+    #38bdf8
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  color: transparent;
+
+  text-shadow:
+    0 0 4px rgba(56, 189, 248, 0.4),
+    0 0 12px rgba(15, 23, 42, 0.6);
+
+  -webkit-text-stroke: 0.02em rgba(15, 23, 42, 0.7);
+
+  /* animação mais suave para o menu */
+  animation: title-breathe-soft 3.4s ease-in-out infinite;
+}
+
+/* linha embaixo do título (menu / padrão: azul + verde) */
+.overlay-title::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  width: 70%;
+  height: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(56, 189, 248, 0.85),
+    rgba(34, 197, 94, 0.85),
+    transparent
+  );
+  filter: blur(0.4px);
+  opacity: 0.8;
+  animation: title-underline 4s ease-in-out infinite;
+}
+
+/* GAME OVER: vermelho, macabro, mais pesado */
+.game-overlay--game-over .overlay-title,
+.game-over-title {
+  background-image: linear-gradient(
+    110deg,
+    #7f1d1d,
+    #b91c1c,
+    #f97373,
+    #b91c1c
+  );
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  color: transparent;
+
+  text-shadow:
+    0 0 6px rgba(248, 113, 113, 0.8),
+    0 0 16px rgba(127, 29, 29, 0.9),
+    0 0 32px rgba(0, 0, 0, 0.9);
+
+  -webkit-text-stroke: 0.03em rgba(0, 0, 0, 0.9);
+
+  /* respira forte + brilho + glitch leve */
+  animation:
+    title-breathe-strong 2.6s ease-in-out infinite,
+    title-shine-red 6s linear infinite,
+    title-glitch 2.2s steps(2, end) infinite;
+}
+
+/* sublinhado vermelho na tela de Game Over */
+.game-overlay--game-over .overlay-title::after,
+.game-over-title::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(248, 113, 113, 0.95),
+    rgba(127, 29, 29, 0.95),
+    transparent
+  );
+  opacity: 0.95;
+  animation: title-underline-danger 2.4s ease-in-out infinite;
+}
+
+/* Ranking: dourado, vitorioso */
+.game-overlay--ranking .overlay-title {
+  background-image: linear-gradient(
+    100deg,
+    #facc15,
+    #fbbf24,
+    #facc15
+  );
+  text-shadow:
+    0 0 6px rgba(250, 204, 21, 0.85),
+    0 0 18px rgba(161, 98, 7, 0.9);
+  -webkit-text-stroke: 0.025em rgba(15, 23, 42, 0.7);
+
+  /* ranking pode ter um leve brilho extra */
+  animation:
+    title-breathe-soft 3s ease-in-out infinite,
+    title-shine 9s linear infinite;
+}
+
+/* sublinhado dourado no ranking */
+.game-overlay--ranking .overlay-title::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(250, 204, 21, 0.95),
+    rgba(251, 191, 36, 0.95),
+    transparent
+  );
+}
+
+/* subtítulo */
+.overlay-subtitle {
+  margin: 18px 0 0;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text-soft);
+  max-width: 640px;
+}
+
+/* destaque no subtítulo */
+.overlay-subtitle-accent {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+/* textos de resumo Game Over */
+.overlay-summary {
+  margin-top: 18px;
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+.overlay-record {
+  margin-top: 4px;
+  font-size: 0.92rem;
+  color: var(--text-soft);
+}
+
+/* helper embaixo dos botões ou listas */
+.overlay-helper {
+  margin-top: 18px;
+  font-size: 0.86rem;
+  color: var(--text-soft-2);
+}
+
+/* ================== INPUT / ERRO (MENU) ================== */
+
+.overlay-input {
+  margin-top: 18px;
+  padding: 10px 16px;
+  width: 100%;
+  max-width: 260px;
+  border-radius: 999px;
+  border: 1px solid rgba(55, 65, 81, 1);
+  background: rgba(15, 23, 42, 0.98);
+  color: #f9fafb;
+  font-size: 0.95rem;
+  outline: none;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease,
+    transform 0.12s ease;
+}
+
+.overlay-input::placeholder {
+  color: #6b7280;
+}
+
+.overlay-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 1);
+  background: rgba(15, 23, 42, 1);
+  transform: translateY(-1px);
+}
+
+.overlay-error {
+  min-height: 18px;
+  font-size: 0.84rem;
+  color: #f97373;
+}
+
+/* ================== BOTÕES ================== */
+
+.overlay-buttons {
+  margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.overlay-button {
+  padding: 11px 24px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    var(--accent-primary),
+    var(--accent-secondary)
+  );
+  color: #020617;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transform: translateY(0);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    filter 0.12s ease;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.95);
+}
+
+.overlay-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.overlay-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.95);
+}
+
+/* Botão fantasma (Voltar no ranking) */
+.overlay-button--ghost {
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid rgba(75, 85, 99, 1);
+  box-shadow: none;
+}
+
+.overlay-button--ghost:hover {
+  background: rgba(15, 23, 42, 0.98);
+}
+
+/* ================== CONTROLE GAME OVER ================== */
+
+.game-over-controller {
+  margin-top: 22px;
+  width: 230px;
+  height: 95px;
+  border-radius: 18px;
+  background: radial-gradient(circle at top, #020617, #020617 65%, #000 100%);
+  border: 1px solid rgba(55, 65, 81, 1);
+  position: relative;
+  box-shadow: 0 12px 20px rgba(15, 23, 42, 0.9);
+  overflow: hidden;
+}
+
+/* detalhe interno discreto */
+.game-over-controller::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 14px;
+  border: 1px dashed rgba(75, 85, 99, 1);
+}
+
+/* ================== RANKING ================== */
+
+.ranking-list {
+  list-style: none;
+  padding: 16px 0 0;
+  margin: 18px 0 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 230px;
+  overflow-y: auto;
+}
+
+.ranking-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(31, 41, 55, 1);
+  font-size: 0.92rem;
+}
+
+.ranking-item__label {
+  font-weight: 500;
+}
+
+.ranking-item__score {
+  font-weight: 700;
+  color: #facc15;
+}
+
+/* destaque no jogador atual */
+.ranking-item--current {
+  border-color: var(--accent-primary);
+  background: rgba(15, 23, 42, 1);
+}
+
+/* scrollbar discreta */
+.ranking-list::-webkit-scrollbar {
+  width: 6px;
+}
+.ranking-list::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 1);
+  border-radius: 3px;
+}
+.ranking-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ================== ANIMAÇÕES ================== */
+
+@keyframes grid-pan {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-80px, -80px, 0);
+  }
+}
+
+/* menu / padrão: respiração suave, agradável */
+@keyframes title-breathe-soft {
+  0% {
+    transform: translateY(0) scale(1);
+    text-shadow:
+      0 0 4px rgba(56, 189, 248, 0.35),
+      0 0 10px rgba(15, 23, 42, 0.6);
+  }
+  50% {
+    transform: translateY(-1px) scale(1.02);
+    text-shadow:
+      0 0 7px rgba(56, 189, 248, 0.55),
+      0 0 14px rgba(15, 23, 42, 0.8);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    text-shadow:
+      0 0 4px rgba(56, 189, 248, 0.35),
+      0 0 10px rgba(15, 23, 42, 0.6);
+  }
+}
+
+/* game over: respiração mais forte, dramática */
+@keyframes title-breathe-strong {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.05);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* brilho escaneando (ranking / geral) */
+@keyframes title-shine {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+
+/* brilho vermelho escaneando (game over) */
+@keyframes title-shine-red {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
+/* sublinhado padrão (menu / ranking) */
+@keyframes title-underline {
+  0%,
+  100% {
+    transform: translateX(-50%) scaleX(0.85);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateX(-50%) scaleX(1);
+    opacity: 0.9;
+  }
+}
+
+/* sublinhado "perigoso" (game over) */
+@keyframes title-underline-danger {
+  0% {
+    transform: translateX(-50%) scaleX(0.7);
+    opacity: 0.15;
+  }
+  40% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(-50%) scaleX(1);
+    opacity: 0.85;
+  }
+}
+
+/* glitch leve para game over (efeito macabro) */
+@keyframes title-glitch {
+  0% {
+    transform: translateX(0) translateY(0);
+    text-shadow:
+      0 0 6px rgba(248, 113, 113, 0.8),
+      0 0 16px rgba(127, 29, 29, 0.9);
+  }
+  20% {
+    transform: translateX(-1px);
+    text-shadow:
+      -1px 0 6px rgba(248, 113, 113, 0.8),
+      1px 0 10px rgba(239, 68, 68, 0.8);
+  }
+  40% {
+    transform: translateX(1px);
+    text-shadow:
+      1px 0 6px rgba(248, 113, 113, 0.8),
+      -1px 0 10px rgba(127, 29, 29, 0.9);
+  }
+  60% {
+    transform: translateX(0);
+  }
+  80% {
+    transform: translateX(-0.5px);
+  }
+  100% {
+    transform: translateX(0);
+  }
 }

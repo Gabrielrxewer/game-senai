@@ -31,8 +31,6 @@ export class GameScene implements State {
 
   private readonly gravity = 1200;
 
-  // Player já usa o próprio jumpForce lá no Player.ts
-
   // Diploma (na frente do player)
   private readonly diplomaWidth = 60;
   private readonly diplomaHeight = 30;
@@ -109,20 +107,26 @@ export class GameScene implements State {
   render(ctx: CanvasRenderingContext2D): void {
     const { width, height } = this.game.getConfig();
 
-    ctx.fillStyle = "#1c2541";
-    ctx.fillRect(0, 0, width, height);
+    // 🔹 Fundo igual às demais telas (gradiente + quadriculado tech)
+    this.renderBackground(ctx, width, height);
 
+    // Nuvens por cima do fundo
     this.renderClouds(ctx);
 
-    ctx.fillStyle = "#3a506b";
-    ctx.fillRect(0, height - this.groundHeight, width, this.groundHeight);
+    // “Chão” (já é desenhado dentro de renderBackground,
+    // mas se quiser customizar depois dá pra mexer aqui também)
 
+    // Diploma (na frente do player)
     this.renderDiploma(ctx);
+
+    // Professor (atrás do player)
     this.renderProfessor(ctx);
 
+    // Player e obstáculos
     this.player.render(ctx);
     this.obstacles.forEach((obstacle) => obstacle.render(ctx));
 
+    // HUD (distância, recorde, nickname)
     ctx.fillStyle = "#f8ffe5";
     ctx.font = '24px "Segoe UI", sans-serif';
     ctx.fillText(`Distância: ${Math.floor(this.distance)} m`, 32, 48);
@@ -307,5 +311,48 @@ export class GameScene implements State {
       );
       ctx.fill();
     });
+  }
+
+  // 🔹 Fundo tech igual às demais telas (gradiente + grid + chão)
+  private renderBackground(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number
+  ): void {
+    // Gradiente vertical escuro (mesma vibe do CSS)
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, "#020617");
+    gradient.addColorStop(0.7, "#020617");
+    gradient.addColorStop(1, "#000000");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // Quadriculado tech (mesma ideia da .game-overlay::before)
+    ctx.save();
+    ctx.strokeStyle = "rgba(15, 23, 42, 0.8)";
+    ctx.lineWidth = 1;
+
+    const cellSize = 40;
+    for (let x = 0; x <= width; x += cellSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+
+    for (let y = 0; y <= height; y += cellSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Chão escuro com uma linha de destaque “neon” na borda
+    ctx.fillStyle = "#020617";
+    ctx.fillRect(0, height - this.groundHeight, width, this.groundHeight);
+
+    ctx.fillStyle = "rgba(56, 189, 248, 0.25)";
+    ctx.fillRect(0, height - this.groundHeight, width, 2);
   }
 }

@@ -23,21 +23,24 @@ export class MenuScene implements State {
 
   onEnter(): void {
     this.overlay = createOverlay("menu-overlay");
+    this.overlay.classList.add("game-overlay--menu");
+
+    const panel = document.createElement("div");
+    panel.className = "overlay-panel";
 
     const title = createTitle("Fuga Acadêmica");
+
     const subtitle = document.createElement("p");
+    subtitle.className = "overlay-subtitle";
     subtitle.innerHTML =
-      "Ajude o aluno a fugir do professor e chegar o mais longe que puder!<br/>Digite seu nickname para começar.";
+      "Ajude o aluno a fugir do professor e chegar o mais longe que puder.<br/>" +
+      '<span class="overlay-subtitle-accent">Escolha um nickname para entrar na fuga.</span>';
 
     this.nicknameInput = document.createElement("input");
     this.nicknameInput.type = "text";
     this.nicknameInput.placeholder = "Digite seu nickname";
-    this.nicknameInput.style.padding = "12px 18px";
-    this.nicknameInput.style.borderRadius = "9999px";
-    this.nicknameInput.style.border = "2px solid #5bc0be";
-    this.nicknameInput.style.fontSize = "1rem";
-    this.nicknameInput.style.width = "260px";
     this.nicknameInput.maxLength = 16;
+    this.nicknameInput.className = "overlay-input";
 
     const lastNickname = this.scoreService.getLastNickname();
     if (lastNickname) {
@@ -45,30 +48,36 @@ export class MenuScene implements State {
     }
 
     this.errorLabel = document.createElement("span");
-    this.errorLabel.style.color = "#ef476f";
-    this.errorLabel.style.height = "20px";
+    this.errorLabel.className = "overlay-error";
 
     const buttonsWrapper = document.createElement("div");
-    buttonsWrapper.style.display = "flex";
-    buttonsWrapper.style.gap = "16px";
+    buttonsWrapper.className = "overlay-buttons";
 
     const playButton = createButton("Jogar");
     playButton.addEventListener("click", () => this.startGame());
 
     const rankingButton = createButton("Ranking");
-    rankingButton.addEventListener("click", () => {
-      this.game.changeState("ranking");
-    });
+    rankingButton.addEventListener("click", () =>
+      this.game.changeState("ranking")
+    );
 
     buttonsWrapper.append(playButton, rankingButton);
 
-    this.overlay.append(
+    const helper = document.createElement("p");
+    helper.className = "overlay-helper";
+    helper.textContent =
+      'Dica: você também pode apertar "Espaço" para começar.';
+
+    panel.append(
       title,
       subtitle,
       this.nicknameInput,
       this.errorLabel,
-      buttonsWrapper
+      buttonsWrapper,
+      helper
     );
+
+    this.overlay.appendChild(panel);
     document.body.appendChild(this.overlay);
   }
 
@@ -86,16 +95,29 @@ export class MenuScene implements State {
 
   render(ctx: CanvasRenderingContext2D): void {
     const { width, height } = this.game.getConfig();
-    ctx.fillStyle = "#1c2541";
+
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#130b32");
+    gradient.addColorStop(0.5, "#111428");
+    gradient.addColorStop(1, "#050816");
+
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = "#5bc0be";
-    ctx.font = '28px "Segoe UI", sans-serif';
-    ctx.fillText(
-      'Pressione espaço ou clique em "Jogar" para iniciar',
-      180,
-      height - 80
+    const radial = ctx.createRadialGradient(
+      0,
+      0,
+      0,
+      0,
+      0,
+      Math.max(width, height)
     );
+    radial.addColorStop(0, "rgba(72, 209, 204, 0.7)");
+    radial.addColorStop(0.4, "rgba(72, 209, 204, 0.0)");
+    radial.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+    ctx.fillStyle = radial;
+    ctx.fillRect(0, 0, width, height);
   }
 
   handleInput(event: KeyboardEvent | MouseEvent): void {
