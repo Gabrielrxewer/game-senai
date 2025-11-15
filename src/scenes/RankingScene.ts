@@ -19,52 +19,65 @@ export class RankingScene implements State {
 
   onEnter(): void {
     this.overlay = createOverlay("ranking-overlay");
+    this.overlay.classList.add("game-overlay--ranking");
+
+    const panel = document.createElement("div");
+    panel.className = "overlay-panel";
 
     const title = createTitle("Ranking Local");
+
     const subtitle = document.createElement("p");
-    subtitle.textContent = "Pontuações mais altas registradas neste navegador.";
+    subtitle.className = "overlay-subtitle";
+    subtitle.textContent =
+      "Maiores distâncias registradas neste navegador. Quem lidera a fuga?";
 
     const list = document.createElement("ol");
-    list.style.listStyle = "none";
-    list.style.padding = "0";
-    list.style.margin = "0";
-    list.style.display = "flex";
-    list.style.flexDirection = "column";
-    list.style.gap = "12px";
-    list.style.width = "320px";
+    list.className = "ranking-list";
 
     const currentPlayer = this.rankingService.getCurrentPlayer();
     const ranking = this.rankingService.loadRanking();
 
-    ranking.forEach((entry, index) => {
-      const item = document.createElement("li");
-      item.style.display = "flex";
-      item.style.justifyContent = "space-between";
-      item.style.padding = "12px 16px";
-      item.style.borderRadius = "12px";
-      item.style.background = "rgba(91, 192, 190, 0.15)";
-      item.textContent = `${index + 1}º ${entry.nickname}`;
+    if (ranking.length === 0) {
+      const emptyState = document.createElement("p");
+      emptyState.className = "overlay-helper";
+      emptyState.textContent =
+        "Nenhuma pontuação ainda. Jogue uma vez para aparecer aqui.";
+      panel.append(title, subtitle, emptyState);
+    } else {
+      ranking.forEach((entry, index) => {
+        const item = document.createElement("li");
+        item.className = "ranking-item";
 
-      const scoreBadge = document.createElement("span");
-      scoreBadge.textContent = `${entry.score} m`;
-      scoreBadge.style.fontWeight = "bold";
-      item.appendChild(scoreBadge);
+        const label = document.createElement("span");
+        label.className = "ranking-item__label";
+        label.textContent = `${index + 1}º  ${entry.nickname}`;
 
-      if (
-        currentPlayer &&
-        entry.nickname.toLowerCase() === currentPlayer.toLowerCase()
-      ) {
-        item.style.background = "rgba(239, 71, 111, 0.35)";
-        item.style.border = "2px solid #ef476f";
-      }
+        const scoreBadge = document.createElement("span");
+        scoreBadge.className = "ranking-item__score";
+        scoreBadge.textContent = `${entry.score} m`;
 
-      list.appendChild(item);
-    });
+        item.append(label, scoreBadge);
+
+        if (
+          currentPlayer &&
+          entry.nickname.toLowerCase() === currentPlayer.toLowerCase()
+        ) {
+          item.classList.add("ranking-item--current");
+        }
+
+        list.appendChild(item);
+      });
+
+      panel.append(title, subtitle, list);
+    }
 
     const backButton = createButton("Voltar");
+    backButton.classList.add("overlay-button--ghost");
     backButton.addEventListener("click", () => this.game.changeState("menu"));
 
-    this.overlay.append(title, subtitle, list, backButton);
+    panel.append(backButton);
+
+    this.overlay.appendChild(panel);
     document.body.appendChild(this.overlay);
   }
 
@@ -77,11 +90,29 @@ export class RankingScene implements State {
 
   render(ctx: CanvasRenderingContext2D): void {
     const { width, height } = this.game.getConfig();
-    ctx.fillStyle = "#1c2541";
+
+    const gradient = ctx.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#130b32");
+    gradient.addColorStop(0.5, "#111428");
+    gradient.addColorStop(1, "#050816");
+
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = "#5bc0be";
-    ctx.font = '32px "Segoe UI", sans-serif';
-    ctx.fillText("Quem lidera a fuga?", 260, height / 2);
+
+    const radial = ctx.createRadialGradient(
+      width,
+      height,
+      0,
+      width,
+      height,
+      Math.max(width, height)
+    );
+    radial.addColorStop(0, "rgba(255, 208, 102, 0.6)");
+    radial.addColorStop(0.4, "rgba(255, 208, 102, 0.0)");
+    radial.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+    ctx.fillStyle = radial;
+    ctx.fillRect(0, 0, width, height);
   }
 
   handleInput(event: KeyboardEvent | MouseEvent): void {
