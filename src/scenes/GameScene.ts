@@ -1,9 +1,12 @@
+
 import type { Game } from "../core/Game";
 import type { State } from "../core/State";
 import { Player } from "../entities/Player";
 import { Obstacle } from "../entities/Obstacle";
 import { RankingService } from "../services/RankingService";
 import { ScoreService } from "../services/ScoreService";
+
+
 
 interface Cloud {
   x: number;
@@ -49,6 +52,11 @@ export class GameScene implements State {
   private professorVelocityY = 0;
   private readonly professorFlapForce = -600;
 
+  // 🔥 Novo estado de jogo
+  private flappyMode = false;
+  private flappyTimer = 0;
+  private nextSwitchDistance = 100; // alterna a cada 1000 metros aprox.
+
   constructor(
     private readonly game: Game,
     private readonly scoreService: ScoreService,
@@ -68,40 +76,48 @@ export class GameScene implements State {
     this.reset();
   }
 
-  onExit(): void {}
+  onExit(): void { }
 
   update(deltaTime: number): void {
     this.distance += this.speed * deltaTime * 0.1;
     this.speed += 5 * deltaTime;
     this.spawnTimer -= deltaTime;
 
-    if (this.spawnTimer <= 0) {
+    // 🧠 Alterna o modo a cada certa distância
+    if (this.distance >= this.nextSwitchDistance) {
+      this.toggleMode();
+    }
+
+    // 🔄 Atualiza o timer do modo flappy
+    if (this.flappyMode) {
+      this.flappyTimer -= deltaTime;
+      if (this.flappyTimer <= 0) {
+        this.exitFlappyMode();
+      }
+    }
+
+    // Spawning de obstáculos (somente no modo normal)
+    if (!this.flappyMode && this.spawnTimer <= 0) {
       this.spawnObstacle();
     }
 
+
+    // Atualizações
     this.player.update(deltaTime);
-    this.obstacles.forEach((obstacle) =>
-      obstacle.update(deltaTime, this.baseObstacleSpeed + this.speed)
-    );
+    this.obstacles.forEach((obstacle) => obstacle.update(deltaTime, this.baseObstacleSpeed + this.speed));
+
 
     while (this.obstacles.length > 0 && this.obstacles[0].isOffScreen()) {
       this.obstacles.shift();
     }
 
-    this.clouds.forEach((cloud) => {
-      cloud.x -= cloud.speed * deltaTime;
-      if (cloud.x + cloud.size < 0) {
-        cloud.x = this.game.getConfig().width + Math.random() * 200;
-        cloud.y = 40 + Math.random() * 150;
-        cloud.speed = 40 + Math.random() * 40;
-        cloud.size = 80 + Math.random() * 60;
-      }
-    });
+    this.updateClouds(deltaTime);
 
     this.updateDiploma(deltaTime);
     this.updateProfessor(deltaTime);
 
-    if (this.hasCollision()) {
+    // Colisão apenas se não for flappy mode
+    if (!this.flappyMode && this.hasCollision()) {
       this.handleGameOver();
     }
   }
@@ -109,24 +125,37 @@ export class GameScene implements State {
   render(ctx: CanvasRenderingContext2D): void {
     const { width, height } = this.game.getConfig();
 
-    ctx.fillStyle = "#1c2541";
+
+    ctx.fillStyle = this.flappyMode ? '#003566' : '#1c2541';
+
     ctx.fillRect(0, 0, width, height);
 
     this.renderClouds(ctx);
 
-    ctx.fillStyle = "#3a506b";
-    ctx.fillRect(0, height - this.groundHeight, width, this.groundHeight);
+
+    if (!this.flappyMode) {
+      ctx.fillStyle = '#3a506b';
+      ctx.fillRect(0, height - this.groundHeight, width, this.groundHeight);
+    }
+
 
     this.renderDiploma(ctx);
     this.renderProfessor(ctx);
 
     this.player.render(ctx);
-    this.obstacles.forEach((obstacle) => obstacle.render(ctx));
+    if (!this.flappyMode) {
+      this.obstacles.forEach((obstacle) => obstacle.render(ctx));
+    }
 
     ctx.fillStyle = "#f8ffe5";
     ctx.font = '24px "Segoe UI", sans-serif';
     ctx.fillText(`Distância: ${Math.floor(this.distance)} m`, 32, 48);
     ctx.fillText(`Recorde: ${this.scoreService.getBestScore()} m`, 32, 80);
+
+    if (this.flappyMode) {
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText('🕊️ Modo Voo!', width / 2 - 60, 60);
+    }
 
     const nickname = this.rankingService.getCurrentPlayer();
     if (nickname) {
@@ -141,16 +170,11 @@ export class GameScene implements State {
         : true;
 
     if (isJumpInput) {
-      if (event instanceof KeyboardEvent) {
-        event.preventDefault();
-      }
-
-      this.player.jump();
-
-      this.flapDiploma();
-      this.flapProfessor();
+      if (event instanceof KeyboardEvent) event.preventDefault();
+      this.player.jump(); // cada clique/aperto aplica força
     }
   }
+
 
   private reset(): void {
     this.player.reset();
@@ -159,17 +183,85 @@ export class GameScene implements State {
     this.speed = 250;
     this.spawnTimer = this.spawnInterval;
 
+
     this.diplomaY = this.groundY - this.diplomaHeight;
     this.diplomaVelocityY = 0;
 
     this.professorY = this.groundY - this.professorHeight;
     this.professorVelocityY = 0;
+
+    this.flappyMode = false;
+    this.nextSwitchDistance = 800 + Math.random() * 400;
+
   }
 
-  private spawnObstacle(): void {
-    this.spawnTimer = Math.max(0.9, this.spawnInterval - this.distance / 500);
-    this.obstacles.push(new Obstacle(Math.random() * 60, this.game));
+  // 🕹️ Alterna modo de jogo
+  private toggleMode(): void {
+    if (this.flappyMode) return; // só entra se estiver no modo normal
+    this.enterFlappyMode();
   }
+
+  private enterFlappyMode(): void {
+    this.flappyMode = true;
+    this.flappyTimer = 3 + Math.random() * 2; // 3–5 segundos de voo
+    this.obstacles.length = 0; // limpa obstáculos
+    this.player.enableGravity(true);
+  }
+
+  private exitFlappyMode(): void {
+    this.flappyMode = false;
+    this.nextSwitchDistance += 800 + Math.random() * 400; // próxima troca
+    this.player.enableGravity(false);
+  }
+
+  private updateClouds(deltaTime: number): void {
+    this.clouds.forEach((cloud) => {
+      cloud.x -= cloud.speed * deltaTime;
+      if (cloud.x + cloud.size < 0) {
+        cloud.x = this.game.getConfig().width + Math.random() * 200;
+        cloud.y = 40 + Math.random() * 150;
+        cloud.speed = 40 + Math.random() * 40;
+        cloud.size = 80 + Math.random() * 60;
+      }
+    });
+  }
+  private spawnObstacle(): void {
+    const { height: canvasHeight, width: canvasWidth } = this.game.getConfig();
+
+    this.spawnTimer = Math.max(0.9, this.spawnInterval - this.distance / 500);
+
+    const speed = 20 + Math.random() * 60;
+    const gap = 140;
+    const minHeight = 60;
+    const maxHeight = 120;
+
+    const bottomHeight = minHeight + Math.random() * (maxHeight - minHeight);
+    const topHeight = canvasHeight - 80 - gap - bottomHeight;
+    const width = 40 + Math.random() * 30;
+    const x = canvasWidth + width;
+
+    const bottomObstacle = new Obstacle(
+      speed,
+      x,
+      canvasHeight - 80 - bottomHeight,
+      width,
+      bottomHeight
+    );
+
+    const topObstacle = new Obstacle(
+      speed,
+      x,
+      0,
+      width,
+      topHeight
+    );
+
+    this.obstacles.push(bottomObstacle, topObstacle);
+  }
+
+
+
+
 
   private hasCollision(): boolean {
     const playerBounds = this.player.getBounds();
@@ -309,3 +401,5 @@ export class GameScene implements State {
     });
   }
 }
+
+

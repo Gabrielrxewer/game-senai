@@ -5,11 +5,12 @@ export class Player {
   private readonly height = 50;
   private readonly color = "#ffe066";
   private gravity = 1200;
-  private jumpForce = -600;
   private velocityY = 0;
   private readonly groundY: number;
   private readonly startX: number;
   private readonly game: Game;
+
+  private isFlappy = false;
 
   public x: number;
   public y: number;
@@ -30,22 +31,35 @@ export class Player {
   }
 
   jump(): void {
-    this.velocityY = this.jumpForce;
+
+    if (this.isFlappy) {
+      this.velocityY = -50; // força do pulo por clique
+    } else {
+      this.velocityY = -400; // força do pulo normal
+    }
   }
 
   update(deltaTime: number): void {
+
     this.velocityY += this.gravity * deltaTime;
     this.y += this.velocityY * deltaTime;
 
-    if (this.y < 0) {
-      this.y = 0;
-      this.velocityY = 0;
-    }
 
     if (this.y + this.height >= this.groundY) {
       this.y = this.groundY - this.height;
       this.velocityY = 0;
     }
+
+
+    if (this.y < 0) {
+      this.y = 0;
+      this.velocityY = 0;
+    }
+  }
+
+
+  enableGravity(active: boolean): void {
+    this.isFlappy = active;
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -61,5 +75,9 @@ export class Player {
 
   getBounds(): DOMRect {
     return new DOMRect(this.x, this.y, this.width, this.height);
+  }
+
+  private isOnGround(): boolean {
+    return this.y + this.height >= this.groundY - 0.5;
   }
 }
