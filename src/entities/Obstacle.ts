@@ -1,20 +1,24 @@
 import type { Game } from "../core/Game";
 
 export class Obstacle {
+  public x: number;
+  public y: number;
   private readonly width: number;
   private readonly height: number;
   private readonly color: string;
-  public x: number;
-  public y: number;
+  private readonly speed: number;
 
-  constructor(private readonly speed: number, game: Game) {
-    const { height: canvasHeight, width: canvasWidth } = game.getConfig();
-    const obstacleHeights = [60, 80, 100];
-    this.height =
-      obstacleHeights[Math.floor(Math.random() * obstacleHeights.length)];
-    this.width = 40 + Math.random() * 30;
-    this.x = canvasWidth + this.width;
-    this.y = canvasHeight - 80 - this.height;
+
+
+  constructor(speed: number, x: number, y: number, width: number, height: number,) {
+
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+    this.speed = speed;
+
+ 
 
     const palette = ["#ef476f", "#ffd166", "#06d6a0", "#118ab2"];
     this.color = palette[Math.floor(Math.random() * palette.length)];
