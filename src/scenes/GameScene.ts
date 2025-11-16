@@ -100,7 +100,7 @@ export class GameScene implements State {
       this.distance += this.speed * deltaTime * 0.1;
       this.speed += 5 * deltaTime;
     } else {
-      this.speed = Math.max(150, this.speed - 60 * deltaTime);
+      this.speed = Math.max(60, this.speed - 120 * deltaTime);
     }
     this.spawnTimer -= deltaTime;
 
@@ -109,9 +109,12 @@ export class GameScene implements State {
     }
 
     this.player.update(deltaTime);
-    this.obstacles.forEach((obstacle) =>
-      obstacle.update(deltaTime, this.baseObstacleSpeed + this.speed)
-    );
+    const obstacleSpeed = this.baseObstacleSpeed + this.speed;
+    this.obstacles.forEach((obstacle) => {
+      const slowdown =
+        this.studentStuck && this.stuckObstacle?.obstacle === obstacle ? 0.08 : 1;
+      obstacle.update(deltaTime, obstacleSpeed * slowdown);
+    });
 
     while (this.obstacles.length > 0 && this.obstacles[0].isOffScreen()) {
       if (this.stuckObstacle && this.obstacles[0] === this.stuckObstacle.obstacle) {
@@ -309,6 +312,16 @@ export class GameScene implements State {
       this.flapDiploma();
     }
 
+    const edgeBuffer = 32;
+
+    if (this.diplomaY < edgeBuffer && this.diplomaVelocityY < 0) {
+      this.diplomaVelocityY *= 0.4;
+    }
+
+    if (this.diplomaY + this.diplomaHeight > this.groundY - edgeBuffer && this.diplomaVelocityY > 0) {
+      this.diplomaVelocityY *= 0.4;
+    }
+
     if (this.diplomaY < 0) {
       this.diplomaY = 0;
       this.diplomaVelocityY = 0;
@@ -358,8 +371,16 @@ export class GameScene implements State {
 
     if (targetY !== null) {
       const professorCenter = this.professorY + this.professorHeight / 2;
-      if (professorCenter > targetY + 12 || this.studentStuck) {
+      const needsToRise = professorCenter > targetY + 12;
+      const needsToDrop = professorCenter < targetY - 12;
+
+      if (needsToRise) {
         this.flapProfessor();
+      }
+
+      if (this.studentStuck && needsToDrop) {
+        // Empurra o professor para baixo mais rápido para não ficar preso no teto
+        this.professorVelocityY += this.gravity * deltaTime * 0.75;
       }
     }
 
