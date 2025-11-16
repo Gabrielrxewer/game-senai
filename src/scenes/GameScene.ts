@@ -148,6 +148,7 @@ export class GameScene implements State {
         this.studentStuck = false;
         this.player.unfreeze();
         this.stuckObstacle = null;
+        this.stuckTimer = 0;
       }
     }
   }
@@ -197,9 +198,9 @@ export class GameScene implements State {
         event.preventDefault();
       }
 
+      // Enquanto estiver preso, o aluno não consegue saltar para evitar atravessar o obstáculo
       if (this.studentStuck) {
-        this.studentStuck = false;
-        this.player.unfreeze();
+        return;
       }
 
       this.player.jump();
