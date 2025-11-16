@@ -6,7 +6,7 @@ export class Player {
   private width = 40;
   private height = 50;
   private readonly gravity = 1200;
-  private readonly jumpForce = -600;
+  private readonly jumpForce = -380;
   private velocityY = 0;
   private readonly groundY: number;
   private readonly startX: number;

@@ -55,16 +55,18 @@ export class GameScene implements State {
   private professorWidth: number;
   private professorHeight: number;
   private professorDistance = 150;
-  private readonly professorMinDistance = 24;
+  private readonly professorMinDistance = 32;
   private readonly professorMaxDistance = 170;
-  private readonly professorDriftRate = 42;
-  private readonly professorCatchupRate = 280;
+  private readonly professorDriftRate = 18;
+  private readonly professorCatchupRate = 110;
   private professorY: number;
   private professorVelocityY = 0;
   private readonly professorFlapForce = -600;
   private readonly professorSprite: HTMLImageElement;
 
   private studentStuck = false;
+  private stuckObstacle: { obstacle: Obstacle; rectIndex: number } | null = null;
+  private stuckOffset = 0;
   private stuckTimer = 0;
   private readonly stuckDuration = 0.85;
 
@@ -114,6 +116,9 @@ export class GameScene implements State {
     );
 
     while (this.obstacles.length > 0 && this.obstacles[0].isOffScreen()) {
+      if (this.stuckObstacle && this.obstacles[0] === this.stuckObstacle.obstacle) {
+        break;
+      }
       this.obstacles.shift();
     }
 
@@ -138,9 +143,11 @@ export class GameScene implements State {
 
     if (this.studentStuck) {
       this.stuckTimer -= deltaTime;
+      this.pinPlayerToObstacle();
       if (this.stuckTimer <= 0) {
         this.studentStuck = false;
         this.player.unfreeze();
+        this.stuckObstacle = null;
       }
     }
   }
@@ -209,6 +216,8 @@ export class GameScene implements State {
     this.speed = 250;
     this.spawnTimer = this.spawnInterval;
     this.studentStuck = false;
+    this.stuckObstacle = null;
+    this.stuckOffset = 0;
 
     this.professorDistance = this.professorMaxDistance;
 
@@ -244,7 +253,7 @@ export class GameScene implements State {
     return null;
   }
 
-  private triggerChase({ bounds, collidedRect }: { obstacle: Obstacle; bounds: DOMRect[]; collidedRect: DOMRect }): void {
+  private triggerChase({ obstacle, bounds, collidedRect }: { obstacle: Obstacle; bounds: DOMRect[]; collidedRect: DOMRect }): void {
     this.studentStuck = true;
     this.stuckTimer = this.stuckDuration;
     this.player.freeze();
@@ -253,6 +262,20 @@ export class GameScene implements State {
     const playerBounds = this.player.getBounds();
     const offsetToSprite = playerBounds.x - this.player.x;
     const targetX = obstacleBounds.x - playerBounds.width - offsetToSprite - 6;
+    this.stuckOffset = playerBounds.width + offsetToSprite + 6;
+    this.stuckObstacle = { obstacle, rectIndex: Math.max(0, bounds.indexOf(obstacleBounds)) };
+    this.player.x = Math.max(60, targetX);
+  }
+
+  private pinPlayerToObstacle(): void {
+    if (!this.stuckObstacle) {
+      return;
+    }
+
+    const { obstacle, rectIndex } = this.stuckObstacle;
+    const rects = obstacle.getBounds();
+    const obstacleBounds = rects[Math.min(rects.length - 1, Math.max(0, rectIndex))];
+    const targetX = obstacleBounds.x - this.stuckOffset;
     this.player.x = Math.max(60, targetX);
   }
 
