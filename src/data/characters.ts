@@ -23,14 +23,32 @@ export interface SpriteDescriptor {
   height: number;
 }
 
+const buildSprite = (primary: string, secondary: string): string => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="112" viewBox="0 0 96 112">` +
+    `<rect width="96" height="112" rx="12" fill="none"/>` +
+    `<circle cx="48" cy="26" r="18" fill="${secondary}"/>` +
+    `<rect x="30" y="46" width="36" height="46" rx="10" fill="${primary}"/>` +
+    `<rect x="26" y="90" width="44" height="14" rx="6" fill="${secondary}"/>` +
+    `</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
+const buildDiploma = (): string => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">` +
+    `<rect x="8" y="20" width="80" height="56" rx="12" fill="#f8efe4" stroke="#c7994b" stroke-width="4"/>` +
+    `<circle cx="68" cy="48" r="14" fill="#ffd166" stroke="#f3722c" stroke-width="4"/>` +
+    `<path d="M68 62 L62 82 L68 76 L74 82 Z" fill="#f3722c"/>` +
+    `</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
 export const CHARACTERS: CharacterSkin[] = [
   {
     id: "fernanda",
     name: "Fernanda",
     title: "Arquiteta do Caos",
     description: "Transforma pilhas de trabalhos em arte abstrata.",
-    spriteUrl:
-      "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/girl.png",
+    spriteUrl: buildSprite("#ffb4c2", "#ffdfe8"),
     renderWidth: 72,
     renderHeight: 86,
     hitbox: { width: 36, height: 64, offsetX: 18, offsetY: 12 },
@@ -41,8 +59,7 @@ export const CHARACTERS: CharacterSkin[] = [
     name: "Gabriel",
     title: "Dev das Madrugadas",
     description: "Compila esperança e debuga sonhos.",
-    spriteUrl:
-      "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/boy.png",
+    spriteUrl: buildSprite("#4ac0ff", "#c3e9ff"),
     renderWidth: 74,
     renderHeight: 88,
     hitbox: { width: 36, height: 66, offsetX: 18, offsetY: 12 },
@@ -53,8 +70,7 @@ export const CHARACTERS: CharacterSkin[] = [
     name: "Adriel",
     title: "Bardo dos Bits",
     description: "Canta commits épicos no corredor.",
-    spriteUrl:
-      "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/manBlue.png",
+    spriteUrl: buildSprite("#7b8bff", "#d6dbff"),
     renderWidth: 70,
     renderHeight: 82,
     hitbox: { width: 34, height: 62, offsetX: 17, offsetY: 12 },
@@ -65,8 +81,7 @@ export const CHARACTERS: CharacterSkin[] = [
     name: "Rafael",
     title: "Engenheiro dos Cafés",
     description: "Equilibra fórmulas e cafeína.",
-    spriteUrl:
-      "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/manOld.png",
+    spriteUrl: buildSprite("#f2a654", "#ffe0b3"),
     renderWidth: 74,
     renderHeight: 88,
     hitbox: { width: 36, height: 66, offsetX: 18, offsetY: 12 },
@@ -77,8 +92,7 @@ export const CHARACTERS: CharacterSkin[] = [
     name: "Bruna",
     title: "Pixel Witch",
     description: "Invoca interfaces que hipnotizam.",
-    spriteUrl:
-      "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/woman.png",
+    spriteUrl: buildSprite("#ff8fb1", "#ffd6e4"),
     renderWidth: 70,
     renderHeight: 84,
     hitbox: { width: 34, height: 62, offsetX: 17, offsetY: 12 },
@@ -89,8 +103,7 @@ export const CHARACTERS: CharacterSkin[] = [
     name: "Carol",
     title: "Guardião das Builds",
     description: "Não deixa bug passar impune.",
-    spriteUrl:
-      "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/girlPink.png",
+    spriteUrl: buildSprite("#63d89e", "#d4f6e5"),
     renderWidth: 70,
     renderHeight: 84,
     hitbox: { width: 34, height: 64, offsetX: 17, offsetY: 12 },
@@ -101,8 +114,7 @@ export const CHARACTERS: CharacterSkin[] = [
     name: "Débora",
     title: "Alquimista UX",
     description: "Mistura acessibilidade com estilo.",
-    spriteUrl:
-      "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/womanGreen.png",
+    spriteUrl: buildSprite("#5bd0f5", "#c9f0ff"),
     renderWidth: 72,
     renderHeight: 86,
     hitbox: { width: 36, height: 64, offsetX: 18, offsetY: 12 },
@@ -111,15 +123,13 @@ export const CHARACTERS: CharacterSkin[] = [
 ];
 
 export const DIPLOMA_SPRITE: SpriteDescriptor = {
-  spriteUrl:
-    "https://raw.githubusercontent.com/kenneyNL/platformer-pack-redux/master/Items/PNG/medalGold.png",
+  spriteUrl: buildDiploma(),
   width: 96,
   height: 96,
 };
 
 export const PROFESSOR_SPRITE: SpriteDescriptor = {
-  spriteUrl:
-    "https://raw.githubusercontent.com/0x72/32x32-sprites/master/sprites/manBrown.png",
+  spriteUrl: buildSprite("#ef476f", "#ffd1dd"),
   width: 90,
   height: 110,
 };
