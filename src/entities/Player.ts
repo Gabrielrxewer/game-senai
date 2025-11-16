@@ -70,6 +70,10 @@ export class Player {
     return this.frozen;
   }
 
+  unfreeze(): void {
+    this.frozen = false;
+  }
+
   update(deltaTime: number): void {
     if (this.frozen) {
       return;

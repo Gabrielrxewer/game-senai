@@ -29,11 +29,23 @@ export class MenuScene implements State {
   onEnter(): void {
     this.overlay = createOverlay("menu-overlay");
 
+    const panel = document.createElement("div");
+    panel.style.display = "flex";
+    panel.style.flexDirection = "column";
+    panel.style.alignItems = "center";
+    panel.style.gap = "12px";
+    panel.style.padding = "24px 28px";
+    panel.style.background = "rgba(14, 26, 55, 0.7)";
+    panel.style.border = "2px solid rgba(91, 192, 190, 0.45)";
+    panel.style.borderRadius = "20px";
+    panel.style.boxShadow = "0 12px 30px rgba(0,0,0,0.35)";
+    panel.style.width = "min(100%, 960px)";
+
     const title = createTitle("Fuga Acadêmica");
     const subtitle = document.createElement("p");
     subtitle.innerHTML =
       "Ajude o aluno a fugir do professor e chegar o mais longe que puder!<br/>Digite seu nickname para começar.";
-
+    
     this.nicknameInput = document.createElement("input");
     this.nicknameInput.type = "text";
     this.nicknameInput.placeholder = "Digite seu nickname";
@@ -56,6 +68,7 @@ export class MenuScene implements State {
     const buttonsWrapper = document.createElement("div");
     buttonsWrapper.style.display = "flex";
     buttonsWrapper.style.gap = "16px";
+    buttonsWrapper.style.justifyContent = "center";
 
     const playButton = createButton("Jogar");
     playButton.addEventListener("click", () => this.startGame());
@@ -146,7 +159,7 @@ export class MenuScene implements State {
 
     selectionWrapper.append(selectionTitle, selectionSubtitle, grid);
 
-    this.overlay.append(
+    panel.append(
       title,
       subtitle,
       this.nicknameInput,
@@ -154,6 +167,8 @@ export class MenuScene implements State {
       selectionWrapper,
       buttonsWrapper
     );
+
+    this.overlay.append(panel);
 
     this.syncCharacterCards();
     document.body.appendChild(this.overlay);
