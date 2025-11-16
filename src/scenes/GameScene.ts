@@ -41,7 +41,7 @@ export class GameScene implements State {
   // Player já usa o próprio jumpForce lá no Player.ts
 
   // Diploma (na frente do player)
-  private readonly diplomaScale = 0.45;
+  private readonly diplomaScale = 0.65;
   private diplomaWidth: number;
   private diplomaHeight: number;
   private readonly diplomaOffsetX = 280; // distância à frente do player
@@ -51,14 +51,14 @@ export class GameScene implements State {
   private readonly diplomaSprite: HTMLImageElement;
 
   // Professor (atrás do player)
-  private readonly professorScale = 0.55;
+  private readonly professorScale = 0.75;
   private professorWidth: number;
   private professorHeight: number;
-  private professorDistance = 230;
-  private readonly professorMinDistance = 70;
-  private readonly professorMaxDistance = 260;
-  private readonly professorDriftRate = 35;
-  private readonly professorCatchupRate = 260;
+  private professorDistance = 150;
+  private readonly professorMinDistance = 24;
+  private readonly professorMaxDistance = 170;
+  private readonly professorDriftRate = 42;
+  private readonly professorCatchupRate = 280;
   private professorY: number;
   private professorVelocityY = 0;
   private readonly professorFlapForce = -600;
@@ -263,6 +263,27 @@ export class GameScene implements State {
     this.game.changeState("game-over");
   }
 
+  private hasProfessorReachedPlayer(): boolean {
+    const professorX = this.player.x - this.professorDistance;
+    const professorRect = new DOMRect(
+      professorX,
+      this.professorY,
+      this.professorWidth,
+      this.professorHeight
+    );
+
+    const playerRect = this.player.getBounds();
+
+    const horizontalOverlap =
+      professorRect.x + professorRect.width - 8 >= playerRect.x &&
+      professorRect.x <= playerRect.x + playerRect.width;
+    const verticalOverlap =
+      professorRect.y + professorRect.height - 8 >= playerRect.y &&
+      professorRect.y <= playerRect.y + playerRect.height + 8;
+
+    return horizontalOverlap && verticalOverlap;
+  }
+
   private flapDiploma(): void {
     this.diplomaVelocityY = this.diplomaFlapForce;
   }
@@ -370,6 +391,10 @@ export class GameScene implements State {
         this.professorHeight
       );
     }
+
+    ctx.fillStyle = "#f8ffe5";
+    ctx.font = '14px "Segoe UI", sans-serif';
+    ctx.fillText("Professor", professorX, professorY - 10);
   }
 
   private createInitialClouds(): void {
@@ -429,7 +454,7 @@ export class GameScene implements State {
         this.professorMinDistance,
         this.professorDistance - this.professorCatchupRate * deltaTime
       );
-      if (this.professorDistance <= this.professorMinDistance + 4) {
+      if (this.hasProfessorReachedPlayer()) {
         this.handleGameOver();
       }
     } else {
@@ -437,6 +462,10 @@ export class GameScene implements State {
         this.professorMaxDistance,
         this.professorDistance + this.professorDriftRate * deltaTime
       );
+    }
+
+    if (this.hasProfessorReachedPlayer()) {
+      this.handleGameOver();
     }
   }
 
