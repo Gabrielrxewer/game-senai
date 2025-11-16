@@ -67,8 +67,6 @@ export class GameScene implements State {
   private studentStuck = false;
   private stuckObstacle: { obstacle: Obstacle; rectIndex: number } | null = null;
   private stuckOffset = 0;
-  private stuckTimer = 0;
-  private readonly stuckDuration = 0.85;
 
   constructor(
     private readonly game: Game,
@@ -142,14 +140,7 @@ export class GameScene implements State {
     }
 
     if (this.studentStuck) {
-      this.stuckTimer -= deltaTime;
       this.pinPlayerToObstacle();
-      if (this.stuckTimer <= 0) {
-        this.studentStuck = false;
-        this.player.unfreeze();
-        this.stuckObstacle = null;
-        this.stuckTimer = 0;
-      }
     }
   }
 
@@ -178,12 +169,6 @@ export class GameScene implements State {
     const nickname = this.rankingService.getCurrentPlayer();
     if (nickname) {
       ctx.fillText(`Aluno: ${nickname}`, width - 220, 48);
-    }
-
-    if (this.studentStuck) {
-      ctx.fillStyle = "#ef476f";
-      ctx.font = '24px "Segoe UI", sans-serif';
-      ctx.fillText("Você ficou preso! Pule para se soltar antes do professor!", 120, 120);
     }
   }
 
@@ -256,7 +241,6 @@ export class GameScene implements State {
 
   private triggerChase({ obstacle, bounds, collidedRect }: { obstacle: Obstacle; bounds: DOMRect[]; collidedRect: DOMRect }): void {
     this.studentStuck = true;
-    this.stuckTimer = this.stuckDuration;
     this.player.freeze();
     // Garante que o aluno pare exatamente antes do obstáculo
     const obstacleBounds = collidedRect ?? bounds[0];
