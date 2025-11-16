@@ -54,9 +54,9 @@ export class GameScene implements State {
   private readonly professorScale = 0.55;
   private professorWidth: number;
   private professorHeight: number;
-  private professorDistance = 360;
+  private professorDistance = 230;
   private readonly professorMinDistance = 70;
-  private readonly professorMaxDistance = 420;
+  private readonly professorMaxDistance = 260;
   private readonly professorDriftRate = 35;
   private readonly professorCatchupRate = 260;
   private professorY: number;
@@ -65,6 +65,8 @@ export class GameScene implements State {
   private readonly professorSprite: HTMLImageElement;
 
   private studentStuck = false;
+  private stuckTimer = 0;
+  private readonly stuckDuration = 0.85;
 
   constructor(
     private readonly game: Game,
@@ -133,6 +135,14 @@ export class GameScene implements State {
     if (collision && !this.studentStuck) {
       this.triggerChase(collision);
     }
+
+    if (this.studentStuck) {
+      this.stuckTimer -= deltaTime;
+      if (this.stuckTimer <= 0) {
+        this.studentStuck = false;
+        this.player.unfreeze();
+      }
+    }
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -164,8 +174,8 @@ export class GameScene implements State {
 
     if (this.studentStuck) {
       ctx.fillStyle = "#ef476f";
-      ctx.font = '28px "Segoe UI", sans-serif';
-      ctx.fillText("Você ficou preso! O professor está chegando...", 160, 120);
+      ctx.font = '24px "Segoe UI", sans-serif';
+      ctx.fillText("Você ficou preso! Pule para se soltar antes do professor!", 120, 120);
     }
   }
 
@@ -175,9 +185,14 @@ export class GameScene implements State {
         ? event.code === "Space" || event.code === "ArrowUp"
         : true;
 
-    if (isJumpInput && !this.studentStuck) {
+    if (isJumpInput) {
       if (event instanceof KeyboardEvent) {
         event.preventDefault();
+      }
+
+      if (this.studentStuck) {
+        this.studentStuck = false;
+        this.player.unfreeze();
       }
 
       this.player.jump();
@@ -206,34 +221,38 @@ export class GameScene implements State {
 
   private spawnObstacle(): void {
     this.spawnTimer = Math.max(0.9, this.spawnInterval - this.distance / 500);
-    this.obstacles.push(new Obstacle(Math.random() * 60, this.game));
+    this.obstacles.push(new Obstacle(Math.random() * 60, this.game, this.groundHeight));
   }
 
-  private getCollidingObstacle(): Obstacle | null {
+  private getCollidingObstacle():
+    | { obstacle: Obstacle; bounds: DOMRect[]; collidedRect: DOMRect }
+    | null {
     const playerBounds = this.player.getBounds();
     for (const obstacle of this.obstacles) {
       const bounds = obstacle.getBounds();
-      const collided =
-        playerBounds.x < bounds.x + bounds.width &&
-        playerBounds.x + playerBounds.width > bounds.x &&
-        playerBounds.y < bounds.y + bounds.height &&
-        playerBounds.y + playerBounds.height > bounds.y;
+      const collided = bounds.find(
+        (rect) =>
+          playerBounds.x < rect.x + rect.width &&
+          playerBounds.x + playerBounds.width > rect.x &&
+          playerBounds.y < rect.y + rect.height &&
+          playerBounds.y + playerBounds.height > rect.y
+      );
       if (collided) {
-        return obstacle;
+        return { obstacle, bounds, collidedRect: collided };
       }
     }
     return null;
   }
 
-  private triggerChase(obstacle: Obstacle): void {
+  private triggerChase({ bounds, collidedRect }: { obstacle: Obstacle; bounds: DOMRect[]; collidedRect: DOMRect }): void {
     this.studentStuck = true;
+    this.stuckTimer = this.stuckDuration;
     this.player.freeze();
     // Garante que o aluno pare exatamente antes do obstáculo
-    const obstacleBounds = obstacle.getBounds();
+    const obstacleBounds = collidedRect ?? bounds[0];
     const playerBounds = this.player.getBounds();
     const offsetToSprite = playerBounds.x - this.player.x;
-    const targetX =
-      obstacleBounds.x - playerBounds.width - offsetToSprite - 6;
+    const targetX = obstacleBounds.x - playerBounds.width - offsetToSprite - 6;
     this.player.x = Math.max(60, targetX);
   }
 
@@ -245,15 +264,21 @@ export class GameScene implements State {
   }
 
   private flapDiploma(): void {
-    if (this.studentStuck) {
-      return;
-    }
     this.diplomaVelocityY = this.diplomaFlapForce;
   }
 
   private updateDiploma(deltaTime: number): void {
     this.diplomaVelocityY += this.gravity * deltaTime;
     this.diplomaY += this.diplomaVelocityY * deltaTime;
+
+    const targetY = this.getFollowerTargetY(
+      this.player.x + this.diplomaOffsetX,
+      this.diplomaHeight
+    );
+
+    if (targetY !== null && this.diplomaY > targetY) {
+      this.flapDiploma();
+    }
 
     if (this.diplomaY < 0) {
       this.diplomaY = 0;
@@ -290,15 +315,24 @@ export class GameScene implements State {
 
   // --- FLAPPY PROFESSOR ---
   private flapProfessor(): void {
-    if (this.studentStuck) {
-      return;
-    }
     this.professorVelocityY = this.professorFlapForce;
   }
 
   private updateProfessor(deltaTime: number): void {
     this.professorVelocityY += this.gravity * deltaTime;
     this.professorY += this.professorVelocityY * deltaTime;
+
+    const targetY = this.getFollowerTargetY(
+      this.player.x - this.professorDistance,
+      this.professorHeight
+    );
+
+    if (targetY !== null) {
+      const professorCenter = this.professorY + this.professorHeight / 2;
+      if (professorCenter > targetY + 12 || this.studentStuck) {
+        this.flapProfessor();
+      }
+    }
 
     if (this.professorY < 0) {
       this.professorY = 0;
@@ -365,6 +399,28 @@ export class GameScene implements State {
       );
       ctx.fill();
     });
+  }
+
+  private getFollowerTargetY(anchorX: number, followerHeight: number): number | null {
+    const { height: canvasHeight } = this.game.getConfig();
+    const upcoming = this.obstacles.find(
+      (obstacle) => obstacle.getX() + obstacle.getWidth() > anchorX
+    );
+
+    if (!upcoming) {
+      return this.groundY - followerHeight - 12;
+    }
+
+    const gapCenter = upcoming.getGapCenter();
+    const gapTop = upcoming.getGapTop();
+    const gapBottom = upcoming.getGapBottom(canvasHeight);
+
+    const clampedCenter = Math.max(
+      gapTop + followerHeight / 2 + 6,
+      Math.min(gapCenter, gapBottom - followerHeight / 2 - 6)
+    );
+
+    return clampedCenter - followerHeight / 2;
   }
 
   private updateChaseProgress(deltaTime: number): void {
