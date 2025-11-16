@@ -1,25 +1,49 @@
 import type { Game } from "../core/Game";
+import type { CharacterHitbox, CharacterSkin } from "../data/characters";
+import { loadSprite } from "../core/spriteCache";
 
 export class Player {
-  private readonly width = 40;
-  private readonly height = 50;
-  private readonly color = "#ffe066";
-  private gravity = 1200;
-  private jumpForce = -600;
+  private width = 40;
+  private height = 50;
+  private readonly gravity = 1200;
+  private readonly jumpForce = -600;
   private velocityY = 0;
   private readonly groundY: number;
   private readonly startX: number;
   private readonly game: Game;
+  private skin: CharacterSkin;
+  private sprite: HTMLImageElement | null = null;
+  private hitbox: CharacterHitbox = {
+    width: 32,
+    height: 42,
+    offsetX: 4,
+    offsetY: 8,
+  };
+  private frozen = false;
 
   public x: number;
   public y: number;
 
-  constructor(game: Game) {
+  constructor(game: Game, initialSkin: CharacterSkin) {
     this.game = game;
     const { height } = game.getConfig();
     this.groundY = height - 80;
     this.startX = 120;
+    this.skin = initialSkin;
+    this.width = initialSkin.renderWidth;
+    this.height = initialSkin.renderHeight;
+    this.hitbox = initialSkin.hitbox;
+    this.sprite = loadSprite(initialSkin.spriteUrl);
     this.x = this.startX;
+    this.y = this.groundY - this.height;
+  }
+
+  setSkin(skin: CharacterSkin): void {
+    this.skin = skin;
+    this.width = skin.renderWidth;
+    this.height = skin.renderHeight;
+    this.hitbox = skin.hitbox;
+    this.sprite = loadSprite(skin.spriteUrl);
     this.y = this.groundY - this.height;
   }
 
@@ -27,13 +51,30 @@ export class Player {
     this.x = this.startX;
     this.y = this.groundY - this.height;
     this.velocityY = 0;
+    this.frozen = false;
   }
 
   jump(): void {
+    if (this.frozen) {
+      return;
+    }
     this.velocityY = this.jumpForce;
   }
 
+  freeze(): void {
+    this.frozen = true;
+    this.velocityY = 0;
+  }
+
+  isFrozen(): boolean {
+    return this.frozen;
+  }
+
   update(deltaTime: number): void {
+    if (this.frozen) {
+      return;
+    }
+
     this.velocityY += this.gravity * deltaTime;
     this.y += this.velocityY * deltaTime;
 
@@ -49,17 +90,20 @@ export class Player {
   }
 
   render(ctx: CanvasRenderingContext2D): void {
-    ctx.fillStyle = this.color;
-    ctx.fillRect(this.x, this.y, this.width, this.height);
-
-    ctx.fillStyle = "#1c2541";
-    ctx.fillRect(this.x + 8, this.y + 10, this.width - 16, this.height - 20);
-
-    ctx.fillStyle = "#5bc0be";
-    ctx.fillRect(this.x + 8, this.y + this.height - 12, this.width - 16, 8);
+    if (this.sprite && this.sprite.complete) {
+      ctx.drawImage(this.sprite, this.x, this.y, this.width, this.height);
+    } else {
+      ctx.fillStyle = this.skin.accentColor;
+      ctx.fillRect(this.x, this.y, this.width, this.height);
+    }
   }
 
   getBounds(): DOMRect {
-    return new DOMRect(this.x, this.y, this.width, this.height);
+    return new DOMRect(
+      this.x + this.hitbox.offsetX,
+      this.y + this.hitbox.offsetY,
+      this.hitbox.width,
+      this.hitbox.height
+    );
   }
 }
