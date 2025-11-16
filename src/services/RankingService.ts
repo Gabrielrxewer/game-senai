@@ -1,26 +1,27 @@
-import { ScoreService } from './ScoreService';
+import { ScoreService } from "./ScoreService";
 
 export interface RankingEntry {
   nickname: string;
   score: number;
 }
 
-const STORAGE_KEY = 'fuga-academica-ranking';
-
-const DEFAULT_RANKING: RankingEntry[] = [
-  { nickname: 'Aluno1', score: 1200 },
-  { nickname: 'ProPlayer', score: 3000 },
-  { nickname: 'SenaiHero', score: 2200 },
-  { nickname: 'FugaMaster', score: 1800 }
-];
+const STORAGE_KEY = "fuga-academica-ranking";
+const CHARACTER_STORAGE_KEY = "fuga-academica-character";
+const DEFAULT_CHARACTER_ID = "fernanda";
 
 export class RankingService {
   private currentPlayer: string | null = null;
   private lastScore = 0;
+  private selectedCharacterId = DEFAULT_CHARACTER_ID;
 
   constructor(private readonly scoreService: ScoreService) {
     if (!localStorage.getItem(STORAGE_KEY)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_RANKING));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    }
+
+    const storedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
+    if (storedCharacter) {
+      this.selectedCharacterId = storedCharacter;
     }
   }
 
@@ -42,7 +43,7 @@ export class RankingService {
 
   loadRanking(): RankingEntry[] {
     const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed: RankingEntry[] = raw ? JSON.parse(raw) : DEFAULT_RANKING;
+    const parsed: RankingEntry[] = raw ? JSON.parse(raw) : [];
     return parsed.sort((a, b) => b.score - a.score);
   }
 
@@ -70,5 +71,14 @@ export class RankingService {
   isNicknameAvailable(nickname: string): boolean {
     const ranking = this.loadRanking();
     return !ranking.some((entry) => entry.nickname.toLowerCase() === nickname.toLowerCase());
+  }
+
+  setSelectedCharacter(characterId: string): void {
+    this.selectedCharacterId = characterId;
+    localStorage.setItem(CHARACTER_STORAGE_KEY, characterId);
+  }
+
+  getSelectedCharacterId(): string {
+    return this.selectedCharacterId;
   }
 }

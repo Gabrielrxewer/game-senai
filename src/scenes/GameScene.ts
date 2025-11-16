@@ -4,6 +4,13 @@ import { Player } from "../entities/Player";
 import { Obstacle } from "../entities/Obstacle";
 import { RankingService } from "../services/RankingService";
 import { ScoreService } from "../services/ScoreService";
+import {
+  CHARACTERS,
+  DIPLOMA_SPRITE,
+  PROFESSOR_SPRITE,
+  type CharacterSkin,
+} from "../data/characters";
+import { loadSprite } from "../core/spriteCache";
 
 interface Cloud {
   x: number;
@@ -34,20 +41,30 @@ export class GameScene implements State {
   // Player já usa o próprio jumpForce lá no Player.ts
 
   // Diploma (na frente do player)
-  private readonly diplomaWidth = 60;
-  private readonly diplomaHeight = 30;
+  private readonly diplomaScale = 0.45;
+  private diplomaWidth: number;
+  private diplomaHeight: number;
   private readonly diplomaOffsetX = 280; // distância à frente do player
   private diplomaY: number;
   private diplomaVelocityY = 0;
   private readonly diplomaFlapForce = -580;
+  private readonly diplomaSprite: HTMLImageElement;
 
   // Professor (atrás do player)
-  private readonly professorWidth = 38;
-  private readonly professorHeight = 55;
-  private readonly professorOffsetX = 80; // distância atrás do player
+  private readonly professorScale = 0.55;
+  private professorWidth: number;
+  private professorHeight: number;
+  private professorDistance = 360;
+  private readonly professorMinDistance = 70;
+  private readonly professorMaxDistance = 420;
+  private readonly professorDriftRate = 35;
+  private readonly professorCatchupRate = 260;
   private professorY: number;
   private professorVelocityY = 0;
   private readonly professorFlapForce = -600;
+  private readonly professorSprite: HTMLImageElement;
+
+  private studentStuck = false;
 
   constructor(
     private readonly game: Game,
@@ -56,23 +73,33 @@ export class GameScene implements State {
   ) {
     const { height } = game.getConfig();
     this.groundY = height - this.groundHeight;
-
-    this.player = new Player(game);
+    this.player = new Player(game, CHARACTERS[0]);
     this.createInitialClouds();
-
+    this.diplomaWidth = DIPLOMA_SPRITE.width * this.diplomaScale;
+    this.diplomaHeight = DIPLOMA_SPRITE.height * this.diplomaScale;
+    this.diplomaSprite = loadSprite(DIPLOMA_SPRITE.spriteUrl);
+    this.professorWidth = PROFESSOR_SPRITE.width * this.professorScale;
+    this.professorHeight = PROFESSOR_SPRITE.height * this.professorScale;
+    this.professorSprite = loadSprite(PROFESSOR_SPRITE.spriteUrl);
     this.diplomaY = this.groundY - this.diplomaHeight;
     this.professorY = this.groundY - this.professorHeight;
   }
 
   onEnter(): void {
+    const selectedCharacter = this.getSelectedCharacter();
+    this.player.setSkin(selectedCharacter);
     this.reset();
   }
 
   onExit(): void {}
 
   update(deltaTime: number): void {
-    this.distance += this.speed * deltaTime * 0.1;
-    this.speed += 5 * deltaTime;
+    if (!this.studentStuck) {
+      this.distance += this.speed * deltaTime * 0.1;
+      this.speed += 5 * deltaTime;
+    } else {
+      this.speed = Math.max(150, this.speed - 60 * deltaTime);
+    }
     this.spawnTimer -= deltaTime;
 
     if (this.spawnTimer <= 0) {
@@ -100,9 +127,11 @@ export class GameScene implements State {
 
     this.updateDiploma(deltaTime);
     this.updateProfessor(deltaTime);
+    this.updateChaseProgress(deltaTime);
 
-    if (this.hasCollision()) {
-      this.handleGameOver();
+    const collision = this.getCollidingObstacle();
+    if (collision && !this.studentStuck) {
+      this.triggerChase(collision);
     }
   }
 
@@ -132,6 +161,12 @@ export class GameScene implements State {
     if (nickname) {
       ctx.fillText(`Aluno: ${nickname}`, width - 220, 48);
     }
+
+    if (this.studentStuck) {
+      ctx.fillStyle = "#ef476f";
+      ctx.font = '28px "Segoe UI", sans-serif';
+      ctx.fillText("Você ficou preso! O professor está chegando...", 160, 120);
+    }
   }
 
   handleInput(event: KeyboardEvent | MouseEvent): void {
@@ -140,7 +175,7 @@ export class GameScene implements State {
         ? event.code === "Space" || event.code === "ArrowUp"
         : true;
 
-    if (isJumpInput) {
+    if (isJumpInput && !this.studentStuck) {
       if (event instanceof KeyboardEvent) {
         event.preventDefault();
       }
@@ -158,6 +193,9 @@ export class GameScene implements State {
     this.distance = 0;
     this.speed = 250;
     this.spawnTimer = this.spawnInterval;
+    this.studentStuck = false;
+
+    this.professorDistance = this.professorMaxDistance;
 
     this.diplomaY = this.groundY - this.diplomaHeight;
     this.diplomaVelocityY = 0;
@@ -171,17 +209,32 @@ export class GameScene implements State {
     this.obstacles.push(new Obstacle(Math.random() * 60, this.game));
   }
 
-  private hasCollision(): boolean {
+  private getCollidingObstacle(): Obstacle | null {
     const playerBounds = this.player.getBounds();
-    return this.obstacles.some((obstacle) => {
+    for (const obstacle of this.obstacles) {
       const bounds = obstacle.getBounds();
-      return (
+      const collided =
         playerBounds.x < bounds.x + bounds.width &&
         playerBounds.x + playerBounds.width > bounds.x &&
         playerBounds.y < bounds.y + bounds.height &&
-        playerBounds.y + playerBounds.height > bounds.y
-      );
-    });
+        playerBounds.y + playerBounds.height > bounds.y;
+      if (collided) {
+        return obstacle;
+      }
+    }
+    return null;
+  }
+
+  private triggerChase(obstacle: Obstacle): void {
+    this.studentStuck = true;
+    this.player.freeze();
+    // Garante que o aluno pare exatamente antes do obstáculo
+    const obstacleBounds = obstacle.getBounds();
+    const playerBounds = this.player.getBounds();
+    const offsetToSprite = playerBounds.x - this.player.x;
+    const targetX =
+      obstacleBounds.x - playerBounds.width - offsetToSprite - 6;
+    this.player.x = Math.max(60, targetX);
   }
 
   private handleGameOver(): void {
@@ -192,6 +245,9 @@ export class GameScene implements State {
   }
 
   private flapDiploma(): void {
+    if (this.studentStuck) {
+      return;
+    }
     this.diplomaVelocityY = this.diplomaFlapForce;
   }
 
@@ -214,22 +270,18 @@ export class GameScene implements State {
     const diplomaX = this.player.x + this.diplomaOffsetX;
     const diplomaY = this.diplomaY;
 
-    ctx.fillStyle = "#ffe066";
-    ctx.fillRect(diplomaX, diplomaY, this.diplomaWidth, this.diplomaHeight);
-    ctx.strokeStyle = "#d4a418";
-    ctx.lineWidth = 4;
-    ctx.strokeRect(diplomaX, diplomaY, this.diplomaWidth, this.diplomaHeight);
-
-    ctx.fillStyle = "#ef476f";
-    ctx.beginPath();
-    ctx.arc(
-      diplomaX + this.diplomaWidth - 10,
-      diplomaY + this.diplomaHeight / 2,
-      8,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
+    if (this.diplomaSprite.complete) {
+      ctx.drawImage(
+        this.diplomaSprite,
+        diplomaX,
+        diplomaY,
+        this.diplomaWidth,
+        this.diplomaHeight
+      );
+    } else {
+      ctx.fillStyle = "#ffe066";
+      ctx.fillRect(diplomaX, diplomaY, this.diplomaWidth, this.diplomaHeight);
+    }
 
     ctx.fillStyle = "#f8ffe5";
     ctx.font = '14px "Segoe UI", sans-serif';
@@ -238,6 +290,9 @@ export class GameScene implements State {
 
   // --- FLAPPY PROFESSOR ---
   private flapProfessor(): void {
+    if (this.studentStuck) {
+      return;
+    }
     this.professorVelocityY = this.professorFlapForce;
   }
 
@@ -257,27 +312,30 @@ export class GameScene implements State {
   }
 
   private renderProfessor(ctx: CanvasRenderingContext2D): void {
-    const professorX = this.player.x - this.professorOffsetX;
+    const professorX = this.player.x - this.professorDistance;
     const professorY = this.professorY;
 
-    ctx.fillStyle = "#ef476f";
-    ctx.fillRect(
-      professorX,
-      professorY,
-      this.professorWidth,
-      this.professorHeight
-    );
+    if (professorX + this.professorWidth < -40) {
+      return;
+    }
 
-    ctx.fillStyle = "#1c2541";
-    ctx.fillRect(professorX + 6, professorY + 10, this.professorWidth - 12, 20);
-
-    ctx.fillStyle = "#ffd166";
-    ctx.fillRect(
-      professorX + (this.professorWidth - 18) / 2,
-      professorY - 8,
-      18,
-      18
-    );
+    if (this.professorSprite.complete) {
+      ctx.drawImage(
+        this.professorSprite,
+        professorX,
+        professorY,
+        this.professorWidth,
+        this.professorHeight
+      );
+    } else {
+      ctx.fillStyle = "#ef476f";
+      ctx.fillRect(
+        professorX,
+        professorY,
+        this.professorWidth,
+        this.professorHeight
+      );
+    }
   }
 
   private createInitialClouds(): void {
@@ -307,5 +365,27 @@ export class GameScene implements State {
       );
       ctx.fill();
     });
+  }
+
+  private updateChaseProgress(deltaTime: number): void {
+    if (this.studentStuck) {
+      this.professorDistance = Math.max(
+        this.professorMinDistance,
+        this.professorDistance - this.professorCatchupRate * deltaTime
+      );
+      if (this.professorDistance <= this.professorMinDistance + 4) {
+        this.handleGameOver();
+      }
+    } else {
+      this.professorDistance = Math.min(
+        this.professorMaxDistance,
+        this.professorDistance + this.professorDriftRate * deltaTime
+      );
+    }
+  }
+
+  private getSelectedCharacter(): CharacterSkin {
+    const selectedId = this.rankingService.getSelectedCharacterId();
+    return CHARACTERS.find((character) => character.id === selectedId) ?? CHARACTERS[0];
   }
 }
