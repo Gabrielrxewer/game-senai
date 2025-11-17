@@ -67,8 +67,7 @@ export class GameScene implements State {
   private studentStuck = false;
   private stuckObstacle: { obstacle: Obstacle; rectIndex: number } | null = null;
   private stuckOffset = 0;
-  private stuckTimer = 0;
-  private readonly stuckDuration = 0.85;
+  private captureTimer = 0;
 
   constructor(
     private readonly game: Game,
@@ -101,19 +100,20 @@ export class GameScene implements State {
     if (!this.studentStuck) {
       this.distance += this.speed * deltaTime * 0.1;
       this.speed += 5 * deltaTime;
-    } else {
-      this.speed = Math.max(150, this.speed - 60 * deltaTime);
     }
     this.spawnTimer -= deltaTime;
 
-    if (this.spawnTimer <= 0) {
+    if (this.spawnTimer <= 0 && !this.studentStuck) {
       this.spawnObstacle();
     }
 
     this.player.update(deltaTime);
-    this.obstacles.forEach((obstacle) =>
-      obstacle.update(deltaTime, this.baseObstacleSpeed + this.speed)
-    );
+    const obstacleSpeed = this.baseObstacleSpeed + this.speed;
+    this.obstacles.forEach((obstacle) => {
+      const slowdown =
+        this.studentStuck && this.stuckObstacle?.obstacle === obstacle ? 0 : 1;
+      obstacle.update(deltaTime, obstacleSpeed * slowdown);
+    });
 
     while (this.obstacles.length > 0 && this.obstacles[0].isOffScreen()) {
       if (this.stuckObstacle && this.obstacles[0] === this.stuckObstacle.obstacle) {
@@ -142,14 +142,7 @@ export class GameScene implements State {
     }
 
     if (this.studentStuck) {
-      this.stuckTimer -= deltaTime;
       this.pinPlayerToObstacle();
-      if (this.stuckTimer <= 0) {
-        this.studentStuck = false;
-        this.player.unfreeze();
-        this.stuckObstacle = null;
-        this.stuckTimer = 0;
-      }
     }
   }
 
@@ -179,12 +172,6 @@ export class GameScene implements State {
     if (nickname) {
       ctx.fillText(`Aluno: ${nickname}`, width - 220, 48);
     }
-
-    if (this.studentStuck) {
-      ctx.fillStyle = "#ef476f";
-      ctx.font = '24px "Segoe UI", sans-serif';
-      ctx.fillText("Você ficou preso! Pule para se soltar antes do professor!", 120, 120);
-    }
   }
 
   handleInput(event: KeyboardEvent | MouseEvent): void {
@@ -204,9 +191,6 @@ export class GameScene implements State {
       }
 
       this.player.jump();
-
-      this.flapDiploma();
-      this.flapProfessor();
     }
   }
 
@@ -219,6 +203,7 @@ export class GameScene implements State {
     this.studentStuck = false;
     this.stuckObstacle = null;
     this.stuckOffset = 0;
+    this.captureTimer = 0;
 
     this.professorDistance = this.professorMaxDistance;
 
@@ -256,8 +241,10 @@ export class GameScene implements State {
 
   private triggerChase({ obstacle, bounds, collidedRect }: { obstacle: Obstacle; bounds: DOMRect[]; collidedRect: DOMRect }): void {
     this.studentStuck = true;
-    this.stuckTimer = this.stuckDuration;
     this.player.freeze();
+    this.speed = 0;
+    this.spawnTimer = this.spawnInterval;
+    this.captureTimer = 0.65;
     // Garante que o aluno pare exatamente antes do obstáculo
     const obstacleBounds = collidedRect ?? bounds[0];
     const playerBounds = this.player.getBounds();
@@ -266,6 +253,9 @@ export class GameScene implements State {
     this.stuckOffset = playerBounds.width + offsetToSprite + 6;
     this.stuckObstacle = { obstacle, rectIndex: Math.max(0, bounds.indexOf(obstacleBounds)) };
     this.player.x = Math.max(60, targetX);
+
+    // Faz o professor iniciar a aproximação imediatamente
+    this.professorDistance = Math.max(this.professorMinDistance, this.professorDistance * 0.25);
   }
 
   private pinPlayerToObstacle(): void {
@@ -325,6 +315,16 @@ export class GameScene implements State {
       this.flapDiploma();
     }
 
+    const edgeBuffer = 32;
+
+    if (this.diplomaY < edgeBuffer && this.diplomaVelocityY < 0) {
+      this.diplomaVelocityY *= 0.4;
+    }
+
+    if (this.diplomaY + this.diplomaHeight > this.groundY - edgeBuffer && this.diplomaVelocityY > 0) {
+      this.diplomaVelocityY *= 0.4;
+    }
+
     if (this.diplomaY < 0) {
       this.diplomaY = 0;
       this.diplomaVelocityY = 0;
@@ -367,15 +367,22 @@ export class GameScene implements State {
     this.professorVelocityY += this.gravity * deltaTime;
     this.professorY += this.professorVelocityY * deltaTime;
 
-    const targetY = this.getFollowerTargetY(
-      this.player.x - this.professorDistance,
-      this.professorHeight
-    );
+    const targetY = this.studentStuck
+      ? this.player.getBounds().y + this.player.getBounds().height / 2 - this.professorHeight / 2
+      : this.getFollowerTargetY(this.player.x - this.professorDistance, this.professorHeight);
 
     if (targetY !== null) {
       const professorCenter = this.professorY + this.professorHeight / 2;
-      if (professorCenter > targetY + 12 || this.studentStuck) {
+      const needsToRise = professorCenter > targetY + 12;
+      const needsToDrop = professorCenter < targetY - 12;
+
+      if (needsToRise) {
         this.flapProfessor();
+      }
+
+      if (this.studentStuck && needsToDrop) {
+        // Empurra o professor para baixo mais rápido para não ficar preso no teto
+        this.professorVelocityY += this.gravity * deltaTime * 0.75;
       }
     }
 
@@ -476,10 +483,16 @@ export class GameScene implements State {
     if (this.studentStuck) {
       this.professorDistance = Math.max(
         this.professorMinDistance,
-        this.professorDistance - this.professorCatchupRate * deltaTime
+        this.professorDistance - this.professorCatchupRate * deltaTime * 2.8
       );
       if (this.hasProfessorReachedPlayer()) {
-        this.handleGameOver();
+        this.captureTimer = Math.max(0.15, this.captureTimer);
+      }
+      if (this.captureTimer > 0) {
+        this.captureTimer -= deltaTime;
+        if (this.captureTimer <= 0) {
+          this.handleGameOver();
+        }
       }
     } else {
       this.professorDistance = Math.min(
@@ -488,7 +501,7 @@ export class GameScene implements State {
       );
     }
 
-    if (this.hasProfessorReachedPlayer()) {
+    if (!this.studentStuck && this.hasProfessorReachedPlayer()) {
       this.handleGameOver();
     }
   }
