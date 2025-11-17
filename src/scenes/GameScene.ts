@@ -67,6 +67,7 @@ export class GameScene implements State {
   private studentStuck = false;
   private stuckObstacle: { obstacle: Obstacle; rectIndex: number } | null = null;
   private stuckOffset = 0;
+  private captureTimer = 0;
 
   constructor(
     private readonly game: Game,
@@ -205,6 +206,7 @@ export class GameScene implements State {
     this.studentStuck = false;
     this.stuckObstacle = null;
     this.stuckOffset = 0;
+    this.captureTimer = 0;
 
     this.professorDistance = this.professorMaxDistance;
 
@@ -245,6 +247,7 @@ export class GameScene implements State {
     this.player.freeze();
     this.speed = 0;
     this.spawnTimer = this.spawnInterval;
+    this.captureTimer = 0.65;
     // Garante que o aluno pare exatamente antes do obstáculo
     const obstacleBounds = collidedRect ?? bounds[0];
     const playerBounds = this.player.getBounds();
@@ -253,6 +256,9 @@ export class GameScene implements State {
     this.stuckOffset = playerBounds.width + offsetToSprite + 6;
     this.stuckObstacle = { obstacle, rectIndex: Math.max(0, bounds.indexOf(obstacleBounds)) };
     this.player.x = Math.max(60, targetX);
+
+    // Faz o professor iniciar a aproximação imediatamente
+    this.professorDistance = Math.max(this.professorMinDistance, this.professorDistance * 0.25);
   }
 
   private pinPlayerToObstacle(): void {
@@ -481,10 +487,16 @@ export class GameScene implements State {
     if (this.studentStuck) {
       this.professorDistance = Math.max(
         this.professorMinDistance,
-        this.professorDistance - this.professorCatchupRate * deltaTime * 1.6
+        this.professorDistance - this.professorCatchupRate * deltaTime * 2.8
       );
       if (this.hasProfessorReachedPlayer()) {
-        this.handleGameOver();
+        this.captureTimer = Math.max(0.15, this.captureTimer);
+      }
+      if (this.captureTimer > 0) {
+        this.captureTimer -= deltaTime;
+        if (this.captureTimer <= 0) {
+          this.handleGameOver();
+        }
       }
     } else {
       this.professorDistance = Math.min(
@@ -493,7 +505,7 @@ export class GameScene implements State {
       );
     }
 
-    if (this.hasProfessorReachedPlayer()) {
+    if (!this.studentStuck && this.hasProfessorReachedPlayer()) {
       this.handleGameOver();
     }
   }
