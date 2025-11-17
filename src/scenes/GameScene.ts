@@ -99,12 +99,10 @@ export class GameScene implements State {
     if (!this.studentStuck) {
       this.distance += this.speed * deltaTime * 0.1;
       this.speed += 5 * deltaTime;
-    } else {
-      this.speed = Math.max(60, this.speed - 120 * deltaTime);
     }
     this.spawnTimer -= deltaTime;
 
-    if (this.spawnTimer <= 0) {
+    if (this.spawnTimer <= 0 && !this.studentStuck) {
       this.spawnObstacle();
     }
 
@@ -112,7 +110,7 @@ export class GameScene implements State {
     const obstacleSpeed = this.baseObstacleSpeed + this.speed;
     this.obstacles.forEach((obstacle) => {
       const slowdown =
-        this.studentStuck && this.stuckObstacle?.obstacle === obstacle ? 0.08 : 1;
+        this.studentStuck && this.stuckObstacle?.obstacle === obstacle ? 0 : 1;
       obstacle.update(deltaTime, obstacleSpeed * slowdown);
     });
 
@@ -245,6 +243,8 @@ export class GameScene implements State {
   private triggerChase({ obstacle, bounds, collidedRect }: { obstacle: Obstacle; bounds: DOMRect[]; collidedRect: DOMRect }): void {
     this.studentStuck = true;
     this.player.freeze();
+    this.speed = 0;
+    this.spawnTimer = this.spawnInterval;
     // Garante que o aluno pare exatamente antes do obstáculo
     const obstacleBounds = collidedRect ?? bounds[0];
     const playerBounds = this.player.getBounds();
@@ -481,7 +481,7 @@ export class GameScene implements State {
     if (this.studentStuck) {
       this.professorDistance = Math.max(
         this.professorMinDistance,
-        this.professorDistance - this.professorCatchupRate * deltaTime
+        this.professorDistance - this.professorCatchupRate * deltaTime * 1.6
       );
       if (this.hasProfessorReachedPlayer()) {
         this.handleGameOver();
