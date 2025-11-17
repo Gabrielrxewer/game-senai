@@ -191,9 +191,6 @@ export class GameScene implements State {
       }
 
       this.player.jump();
-
-      this.flapDiploma();
-      this.flapProfessor();
     }
   }
 
@@ -370,10 +367,9 @@ export class GameScene implements State {
     this.professorVelocityY += this.gravity * deltaTime;
     this.professorY += this.professorVelocityY * deltaTime;
 
-    const targetY = this.getFollowerTargetY(
-      this.player.x - this.professorDistance,
-      this.professorHeight
-    );
+    const targetY = this.studentStuck
+      ? this.player.getBounds().y + this.player.getBounds().height / 2 - this.professorHeight / 2
+      : this.getFollowerTargetY(this.player.x - this.professorDistance, this.professorHeight);
 
     if (targetY !== null) {
       const professorCenter = this.professorY + this.professorHeight / 2;
